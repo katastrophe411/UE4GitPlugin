@@ -13,8 +13,13 @@
 
 #define LOCTEXT_NAMESPACE "GitSourceControl"
 
-bool FGitSourceControlRevision::Get( FString& InOutFilename ) const
+bool FGitSourceControlRevision::Get( FString& InOutFilename, EConcurrency::Type InConcurrency ) const
 {
+	if (InConcurrency != EConcurrency::Synchronous)
+	{
+		UE_LOG(LogSourceControl, Warning, TEXT("Only EConcurrency::Synchronous is tested/supported for this operation."));
+	}
+
 	FGitSourceControlModule& GitSourceControl = FModuleManager::GetModuleChecked<FGitSourceControlModule>("GitSourceControl");
 	const FString PathToGitBinary = GitSourceControl.AccessSettings().GetBinaryPath();
 	const FString PathToRepositoryRoot = GitSourceControl.GetProvider().GetPathToRepositoryRoot();

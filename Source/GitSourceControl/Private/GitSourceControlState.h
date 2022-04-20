@@ -39,7 +39,7 @@ namespace ELockState
 	};
 }
 
-class FGitSourceControlState : public ISourceControlState, public TSharedFromThis<FGitSourceControlState, ESPMode::ThreadSafe>
+class FGitSourceControlState : public ISourceControlState
 {
 public:
 	FGitSourceControlState( const FString& InLocalFilename, const bool InUsingLfsLocking)
@@ -86,6 +86,10 @@ public:
 	virtual bool CanAdd() const override;
 	virtual bool IsConflicted() const override;
 	virtual bool CanRevert() const override;
+
+	/** override UE5.0 */
+	virtual FSlateIcon GetIcon() const override;
+	/** override UE5.0 */
 
 public:
 	/** History of the item, if any */

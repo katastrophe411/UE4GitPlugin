@@ -464,4 +464,58 @@ ECommandResult::Type FGitSourceControlProvider::IssueCommand(FGitSourceControlCo
 	}
 }
 
+ECommandResult::Type FGitSourceControlProvider::Execute(const FSourceControlOperationRef& InOperation, FSourceControlChangelistPtr InChangelist, const TArray<FString>& InFiles, EConcurrency::Type InConcurrency, const FSourceControlOperationComplete& InOperationCompleteDelegate)
+{
+	if (!IsEnabled() && !(InOperation->GetName() == "Connect")) // Only Connect operation allowed while not Enabled (Connected)
+	{
+		// Note that IsEnabled() always returns true so unless it is changed, this code will never be executed
+		InOperationCompleteDelegate.ExecuteIfBound(InOperation, ECommandResult::Failed);
+		return ECommandResult::Failed;
+	}
+
+	TArray<FString> AbsoluteFiles = SourceControlHelpers::AbsoluteFilenames(InFiles);
+
+	// Query to see if we allow this operation
+	TSharedPtr<IGitSourceControlWorker, ESPMode::ThreadSafe> Worker = CreateWorker(InOperation->GetName());
+	if (!Worker.IsValid())
+	{
+		// this operation is unsupported by this source control provider
+		FFormatNamedArguments Arguments;
+		Arguments.Add(TEXT("OperationName"), FText::FromName(InOperation->GetName()));
+		Arguments.Add(TEXT("ProviderName"), FText::FromName(GetName()));
+		FText Message(FText::Format(LOCTEXT("UnsupportedOperation", "Operation '{OperationName}' not supported by source control provider '{ProviderName}'"), Arguments));
+		FMessageLog("SourceControl").Error(Message);
+		InOperation->AddErrorMessge(Message);
+
+		InOperationCompleteDelegate.ExecuteIfBound(InOperation, ECommandResult::Failed);
+		return ECommandResult::Failed;
+	}
+
+	FGitSourceControlCommand* Command = new FGitSourceControlCommand(InOperation, Worker.ToSharedRef());
+	Command->Files = AbsoluteFiles;
+	Command->OperationCompleteDelegate = InOperationCompleteDelegate;
+
+	// fire off operation
+	if (InConcurrency == EConcurrency::Synchronous)
+	{
+		Command->bAutoDelete = false;
+		return ExecuteSynchronousCommand(*Command, InOperation->GetInProgressString());
+	}
+	else
+	{
+		Command->bAutoDelete = true;
+		return IssueCommand(*Command);
+	}
+}
+
+ECommandResult::Type FGitSourceControlProvider::GetState(const TArray<FSourceControlChangelistRef>& InChangelists, TArray<FSourceControlChangelistStateRef>& OutState, EStateCacheUsage::Type InStateCacheUsage)
+{
+	return ECommandResult::Failed;
+}
+
+TArray<FSourceControlChangelistRef> FGitSourceControlProvider::GetChangelists(EStateCacheUsage::Type InStateCacheUsage)
+{
+	return TArray<FSourceControlChangelistRef>();
+}
+
 #undef LOCTEXT_NAMESPACE

@@ -4,6 +4,7 @@
 // or copy at http://opensource.org/licenses/MIT)
 
 #include "GitSourceControlState.h"
+#include "Styling/AppStyle.h"
 
 #define LOCTEXT_NAMESPACE "GitSourceControl.State"
 
@@ -381,6 +382,34 @@ bool FGitSourceControlState::IsConflicted() const
 bool FGitSourceControlState::CanRevert() const
 {
 	return CanCheckIn();
+}
+
+FSlateIcon FGitSourceControlState::GetIcon() const
+{
+	switch (WorkingCopyState)
+	{
+	case EWorkingCopyState::Modified:
+		return FSlateIcon(FAppStyle::GetAppStyleSetName(), "Subversion.CheckedOut");
+	case EWorkingCopyState::Added:
+		return FSlateIcon(FAppStyle::GetAppStyleSetName(), "Subversion.OpenForAdd");
+	case EWorkingCopyState::Renamed:
+	case EWorkingCopyState::Copied:
+		return FSlateIcon(FAppStyle::GetAppStyleSetName(), "Subversion.Branched");
+	case EWorkingCopyState::Deleted: // Deleted & Missing files does not show in Content Browser
+	case EWorkingCopyState::Missing:
+		return FSlateIcon(FAppStyle::GetAppStyleSetName(), "Subversion.MarkedForDelete");
+	case EWorkingCopyState::Conflicted:
+		return FSlateIcon(FAppStyle::GetAppStyleSetName(), "Subversion.NotAtHeadRevision");
+	case EWorkingCopyState::NotControlled:
+		return FSlateIcon(FAppStyle::GetAppStyleSetName(), "Subversion.NotInDepot");
+	case EWorkingCopyState::Unknown:
+	case EWorkingCopyState::Unchanged: // Unchanged is the same as "Pristine" (not checked out) for Perforce, ie no icon
+	case EWorkingCopyState::Ignored:
+	default:
+		return FSlateIcon();
+	}
+
+	return FSlateIcon();
 }
 
 #undef LOCTEXT_NAMESPACE

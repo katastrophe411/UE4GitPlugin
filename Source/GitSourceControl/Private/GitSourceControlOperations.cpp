@@ -12,6 +12,7 @@
 #include "GitSourceControlModule.h"
 #include "GitSourceControlCommand.h"
 #include "GitSourceControlUtils.h"
+#include "Algo/Transform.h"
 #include "Logging/MessageLog.h"
 #include "Misc/MessageDialog.h"
 
@@ -648,6 +649,53 @@ bool FGitResolveWorker::Execute( class FGitSourceControlCommand& InCommand )
 
 bool FGitResolveWorker::UpdateStates() const
 {
+	return GitSourceControlUtils::UpdateCachedStates(States);
+}
+
+FName FGitGetPendingChangelistsWork::GetName() const
+{
+	return "GetPendingChangelists";
+}
+
+bool FGitGetPendingChangelistsWork::Execute(FGitSourceControlCommand& InCommand)
+{
+	TSharedRef<FUpdatePendingChangelistsStatus, ESPMode::ThreadSafe> Operation = StaticCastSharedRef<FUpdatePendingChangelistsStatus>(InCommand.Operation);
+
+	TArray<FString> Parameters;
+	Parameters.Add(TEXT("HEAD"));
+	Parameters.Add(TEXT("--name-only"));
+
+	TArray<FString> Results;
+	InCommand.bCommandSuccessful = GitSourceControlUtils::RunCommand(TEXT("diff"), InCommand.PathToGitBinary, InCommand.PathToRepositoryRoot, Parameters, InCommand.Files, Results, InCommand.ErrorMessages);
+
+	TArray<FString> Files;
+	Algo::Transform(Results, Files, [&](const FString& RelativePath)
+	{
+		return FPaths::ConvertRelativePathToFull(InCommand.PathToRepositoryRoot, RelativePath);
+	});
+
+	if (InCommand.bCommandSuccessful)
+	{
+		GitSourceControlUtils::RunUpdateStatus(InCommand.PathToGitBinary, InCommand.PathToRepositoryRoot, InCommand.bUsingGitLfsLocking, Files, InCommand.ErrorMessages, States);
+	}
+
+	return InCommand.bCommandSuccessful;
+}
+
+bool FGitGetPendingChangelistsWork::UpdateStates() const
+{
+	FGitSourceControlModule& GitSourceControl = FModuleManager::GetModuleChecked<FGitSourceControlModule>("GitSourceControl");
+	FGitSourceControlProvider& Provider = GitSourceControl.GetProvider();
+
+	TSharedRef<FGitSourceControlChangeListState, ESPMode::ThreadSafe> ChangelistState = Provider.GetStateInternal();
+
+	ChangelistState->Files.Reset(States.Num());
+	for (const auto& FileState : States)
+	{
+		TSharedRef<FGitSourceControlState, ESPMode::ThreadSafe> CachedFileState = Provider.GetStateInternal(FileState.LocalFilename);
+		ChangelistState->Files.AddUnique(CachedFileState);
+	}
+
 	return GitSourceControlUtils::UpdateCachedStates(States);
 }
 

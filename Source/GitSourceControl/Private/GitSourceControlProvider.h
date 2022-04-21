@@ -15,6 +15,36 @@
 
 class FGitSourceControlCommand;
 
+//** Temporary */
+class FGitSourceControlChangelist : public ISourceControlChangelist
+{
+public:
+};
+
+typedef TSharedRef<class FGitSourceControlChangelist, ESPMode::ThreadSafe> FGitSourceControlChangelistRef;
+
+class FGitSourceControlChangeListState : public ISourceControlChangelistState
+{
+public:
+	FGitSourceControlChangeListState();
+	virtual ~FGitSourceControlChangeListState() override;
+
+	virtual FName GetIconName() const override;
+	virtual FName GetSmallIconName() const override;
+	virtual FText GetDisplayText() const override;
+	virtual FText GetDescriptionText() const override;
+	virtual FText GetDisplayTooltip() const override;
+	virtual const FDateTime& GetTimeStamp() const override;
+	virtual const TArray<FSourceControlStateRef>& GetFilesStates() const override;
+	virtual const TArray<FSourceControlStateRef>& GetShelvedFilesStates() const override;
+	virtual FSourceControlChangelistRef GetChangelist() const override;
+
+public:
+	TArray<FSourceControlStateRef> Files;
+	FDateTime TimeStamp;
+};
+//** Temporary */
+
 DECLARE_DELEGATE_RetVal(FGitSourceControlWorkerRef, FGetGitSourceControlWorker)
 
 /// Git version and capabilites extracted from the string "git version 2.11.0.windows.3"
@@ -54,6 +84,7 @@ public:
 	FGitSourceControlProvider() 
 		: bGitAvailable(false)
 		, bGitRepositoryFound(false)
+		, ChangelistStateCache(new FGitSourceControlChangeListState())
 	{
 	}
 
@@ -139,6 +170,9 @@ public:
 	/** Helper function used to update state cache */
 	TSharedRef<FGitSourceControlState, ESPMode::ThreadSafe> GetStateInternal(const FString& Filename);
 
+	///** Helper function used to update changelists state cache */
+	TSharedRef<FGitSourceControlChangeListState, ESPMode::ThreadSafe> GetStateInternal();
+
 	/**
 	 * Register a worker with the provider.
 	 * This is used internally so the provider can maintain a map of all available operations.
@@ -199,6 +233,7 @@ private:
 
 	/** State cache */
 	TMap<FString, TSharedRef<class FGitSourceControlState, ESPMode::ThreadSafe> > StateCache;
+	TSharedRef<FGitSourceControlChangeListState, ESPMode::ThreadSafe> ChangelistStateCache;
 
 	/** The currently registered source control operations */
 	TMap<FName, FGetGitSourceControlWorker> WorkersMap;

@@ -190,3 +190,16 @@ private:
 	/** Temporary states for results */
 	TArray<FGitSourceControlState> States;
 };
+
+/** Git get pending changelist */
+class FGitGetPendingChangelistsWork : public IGitSourceControlWorker
+{
+public:
+	virtual ~FGitGetPendingChangelistsWork() {}
+	virtual FName GetName() const override;
+	virtual bool Execute(FGitSourceControlCommand& InCommand) override;
+	virtual bool UpdateStates() const override;
+
+public:
+	TArray<FGitSourceControlState> States;
+};

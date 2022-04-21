@@ -25,6 +25,62 @@
 
 static FName ProviderName("Git LFS 2");
 
+FGitSourceControlChangeListState::FGitSourceControlChangeListState()
+	: TimeStamp(FDateTime::Now())
+{
+}
+
+FGitSourceControlChangeListState::~FGitSourceControlChangeListState()
+{
+}
+
+FName FGitSourceControlChangeListState::GetIconName() const
+{
+	return FName("SourceControl.Changelist");
+}
+
+FName FGitSourceControlChangeListState::GetSmallIconName() const
+{
+	return FName("SourceControl.Changelist");
+}
+
+FText FGitSourceControlChangeListState::GetDisplayText() const
+{
+	return FText::FromString("Default");
+}
+
+FText FGitSourceControlChangeListState::GetDescriptionText() const
+{
+	return FText();
+}
+
+FText FGitSourceControlChangeListState::GetDisplayTooltip() const
+{
+	return LOCTEXT("Tooltip", "Tooltip");
+}
+
+const FDateTime& FGitSourceControlChangeListState::GetTimeStamp() const
+{
+	return TimeStamp;
+}
+
+const TArray<FSourceControlStateRef>& FGitSourceControlChangeListState::GetFilesStates() const
+{
+	return Files;
+}
+
+const TArray<FSourceControlStateRef>& FGitSourceControlChangeListState::GetShelvedFilesStates() const
+{
+	static TArray<FSourceControlStateRef> ShelvedFiles;
+	return ShelvedFiles;
+}
+
+FSourceControlChangelistRef FGitSourceControlChangeListState::GetChangelist() const
+{
+	FGitSourceControlChangelistRef ChangelistCopy = MakeShareable(new FGitSourceControlChangelist());
+	return StaticCastSharedRef<ISourceControlChangelist>(ChangelistCopy);
+}
+
 void FGitSourceControlProvider::Init(bool bForceConnection)
 {
 	// Init() is called multiple times at startup: do not check git each time
@@ -131,6 +187,11 @@ TSharedRef<FGitSourceControlState, ESPMode::ThreadSafe> FGitSourceControlProvide
 		StateCache.Add(Filename, NewState);
 		return NewState;
 	}
+}
+
+TSharedRef<FGitSourceControlChangeListState, ESPMode::ThreadSafe> FGitSourceControlProvider::GetStateInternal()
+{
+	return ChangelistStateCache;
 }
 
 FText FGitSourceControlProvider::GetStatusText() const
@@ -289,7 +350,7 @@ bool FGitSourceControlProvider::UsesLocalReadOnlyState() const
 
 bool FGitSourceControlProvider::UsesChangelists() const
 {
-	return false;
+	return true;
 }
 
 bool FGitSourceControlProvider::UsesCheckout() const
@@ -510,12 +571,35 @@ ECommandResult::Type FGitSourceControlProvider::Execute(const FSourceControlOper
 
 ECommandResult::Type FGitSourceControlProvider::GetState(const TArray<FSourceControlChangelistRef>& InChangelists, TArray<FSourceControlChangelistStateRef>& OutState, EStateCacheUsage::Type InStateCacheUsage)
 {
-	return ECommandResult::Failed;
+	if (!IsEnabled())
+	{
+		return ECommandResult::Failed;
+	}
+
+	if (InStateCacheUsage == EStateCacheUsage::ForceUpdate)
+	{
+		TSharedRef<class FUpdatePendingChangelistsStatus, ESPMode::ThreadSafe> UpdatePendingChangelistsOperation = ISourceControlOperation::Create<FUpdatePendingChangelistsStatus>();
+		UpdatePendingChangelistsOperation->SetChangelistsToUpdate(InChangelists);
+
+		ISourceControlProvider::Execute(UpdatePendingChangelistsOperation, EConcurrency::Synchronous);
+	}
+
+	OutState.Add(ChangelistStateCache);
+
+	return ECommandResult::Succeeded;
 }
 
 TArray<FSourceControlChangelistRef> FGitSourceControlProvider::GetChangelists(EStateCacheUsage::Type InStateCacheUsage)
 {
-	return TArray<FSourceControlChangelistRef>();
+	if (!IsEnabled())
+	{
+		return TArray<FSourceControlChangelistRef>();
+	}
+
+	TArray<FSourceControlChangelistRef> Changelists;
+	Changelists.Add( MakeShareable( new FGitSourceControlChangelist() ) );
+
+	return Changelists;
 }
 
 #undef LOCTEXT_NAMESPACE
